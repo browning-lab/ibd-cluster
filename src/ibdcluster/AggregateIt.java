@@ -94,7 +94,7 @@ public class AggregateIt implements SampleFileIt<AggMarker> {
                 sb.append(Const.nl);
                 sb.append("       is a bref3 file");
                 sb.append(Const.nl);
-                sb.append("Suggestion: replace bref3 file with a bgzip-compresssed VCF file");
+                sb.append("Suggestion: replace the bref3 file with a bgzip-compressed VCF file");
                 Utilities.exit(ClustPar.usage() + sb.toString());
             }
             refIt = new Bref3It(par.gt(), mFilter);
