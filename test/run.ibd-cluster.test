@@ -1,0 +1,27 @@
+#!/bin/bash
+if [ ! -f cluster ]; then
+  echo
+  echo "Download ibd-cluster program: cluster"
+  echo
+  wget https://faculty.washington.edu/browning/ibd-cluster.jar
+fi
+
+if [ ! -f ibd-cluster.test.vcf.gz ]; then
+    echo
+    echo "Download test VCF file: ibd-cluster.test.vcf.gz"
+    echo
+    wget https://raw.githubusercontent.com/browning-lab/ibd-cluster/master/test/ibd-cluster.test.vcf.gz
+fi
+
+if [ ! -f ibd-cluster.test.map ]; then
+    echo
+    echo "Download genetic map: ibd-cluster.test.map"
+    echo
+    wget https://raw.githubusercontent.com/browning-lab/ibd-cluster/master/test/ibd-cluster.test.map
+fi
+
+echo
+echo "Run ibd-cluster analysis of test data"
+echo
+java -Xmx4g -jar ibd-cluster.jar gt=ibd-cluster.test.vcf.gz map=ibd-cluster.test.map out=ibd-cluster.test
+
