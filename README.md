@@ -6,7 +6,7 @@ are identical by descent at that position.
 
 The **ibd-cluster** program can analyze biobank-scale sequence data.
 
-Last updated: November 6, 2023
+Last updated: November 6, 2023  
 Current version: 0.1.0
 
 ## Contents
@@ -184,7 +184,7 @@ the **ibd-cluster** method:
 identity by descent and gene conversion.  bioRxiv 2023.11.03.565574;
 doi: https://doi.org/10.1101/2023.11.03.565574
 
-[Sharon Browning](https://sites.uw.edu/sguy/) developed the **ibd-cluster** clustering method.
+[Sharon Browning](https://sites.uw.edu/sguy/) developed the **ibd-cluster** clustering method.  
 [Brian Browning](https://faculty.washington.edu/browning) developed the **ibd-cluster** algorithms and software.
 
 [Contents](#contents)
