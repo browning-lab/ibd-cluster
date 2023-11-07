@@ -17,12 +17,10 @@
  */
 package ibdcluster;
 
-import blbutil.Const;
 import blbutil.FileIt;
 import blbutil.Filter;
 import blbutil.InputIt;
 import blbutil.SampleFileIt;
-import blbutil.Utilities;
 import bref.Bref3It;
 import ints.IndexArray;
 import ints.IntArray;
@@ -86,21 +84,12 @@ public class AggregateIt implements SampleFileIt<AggMarker> {
     private static SampleFileIt<RefGTRec> refIt(ClustPar par) {
         String filename = par.gt().toString();
         Filter<Marker> mFilter = FilterUtil.markerFilter(par.excludemarkers());
+        Filter<String> sFilter = FilterUtil.sampleFilter(par.excludesamples());
         SampleFileIt<RefGTRec> refIt;
         if (filename.endsWith(".bref3")) {
-            if (par.excludesamples()!=null) {
-                StringBuilder sb = new StringBuilder(256);
-                sb.append("ERROR: the excludesamples parameter cannot be used if the gt parameter");
-                sb.append(Const.nl);
-                sb.append("       is a bref3 file");
-                sb.append(Const.nl);
-                sb.append("Suggestion: replace the bref3 file with a bgzip-compressed VCF file");
-                Utilities.exit(ClustPar.usage() + sb.toString());
-            }
-            refIt = new Bref3It(par.gt(), mFilter);
+            refIt = new Bref3It(par.gt(), sFilter, mFilter);
         }
         else {
-            Filter<String> sFilter = FilterUtil.sampleFilter(par.excludesamples());
             int nBufferedBlocks = par.nthreads() << 3;
             FileIt<String> it = InputIt.fromBGZipFile(par.gt(), nBufferedBlocks);
             refIt = RefIt.create(it, sFilter, mFilter);

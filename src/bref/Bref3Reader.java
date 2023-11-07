@@ -25,6 +25,7 @@ import ints.CharArray;
 import ints.IntArray;
 import ints.UnsignedByteArray;
 import java.io.DataInput;
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -37,8 +38,8 @@ import vcf.HapRefGTRec;
 import vcf.VcfFieldFilter;
 
 /**
- * <p>Class {@code Bref3Reader} contains methods for reading a bref 3
- * (binary reference format) file.
+ * <p>Class {@code Bref3Reader} contains methods for reading a bref3
+ * (binary reference format version 3) file.
  * </p>
  * <p>Instances of class {@code Bref3Reader} are not thread-safe.
  * </p>
@@ -55,39 +56,54 @@ public final class Bref3Reader {
 
     private final Filter<Marker> markerFilter;
     private final String program;
+    private final Bref3Header brefHeader;
+    private final int[] includedHapIndices;
+    private final int[] invIncludedHapIndices;
     private final Samples samples;
-    private final int nHaps;
+
     private final byte[] byteBuffer;
+    private final char[] hapToSeq;
 
     /**
      * Constructs a new {@code Bref3Reader} instance.
-     * @param bref a {@code DataInput} instance reading from a bref v3 file
-     * @param markerFilter a marker filter or {@code null}
+     * @param source the source bref3 file or {@code null} if the bref3 file
+     * is read from stdin
+     * @param dataIn a {@code DataInput} instance reading from a bref3 file
      *
      * @throws IllegalArgumentException if a format error is detected in a
-     * line of the specified bref v3 file
-     * @throws NullPointerException if {@code file == null}
+     * line of the specified bref3 file
+     * @throws NullPointerException if {@code (dataIn == null)}
      */
-    public Bref3Reader(DataInput bref, Filter<Marker> markerFilter) {
-        if (markerFilter == null) {
-            markerFilter = Filter.acceptAllFilter();
+    public Bref3Reader(File source, DataInput dataIn) {
+        this(source, dataIn, Filter.acceptAllFilter(), Filter.acceptAllFilter());
+    }
+
+    /**
+     * Constructs a new {@code Bref3Reader} instance.
+     * @param source the source bref3 file or {@code null} if the bref3 file
+     * is read from stdin
+     * @param dataIn a {@code DataInput} instance reading from a bref3 file
+     * @param sampleFilter a sample filter
+     * @param markerFilter a marker filter
+     *
+     * @throws IllegalArgumentException if a format error is detected in a
+     * line of the specified bref3 file
+     * @throws NullPointerException if
+     * {@code (dataIn == null) || (sampleFilter == null) || (markerFilter == null)}
+     */
+    public Bref3Reader(File source, DataInput dataIn,
+            Filter<String> sampleFilter, Filter<Marker> markerFilter) {
+        if (markerFilter==null) {
+            throw new NullPointerException("markerFilter==null");
         }
-        String[] sampleIds = null;
-        String programString = null;
-        try {
-            readAndCheckMagicNumber(bref);
-            programString = readString(bref);
-            sampleIds = readStringArray(bref);
-        } catch (IOException ex) {
-            Utilities.exit(ex, READ_ERR);
-        }
-        boolean[] isDiploid = new boolean[sampleIds.length];
-        Arrays.fill(isDiploid, true);
-        this.program = programString;
-        this.samples = Samples.fromIds(sampleIds, isDiploid);
+        this.brefHeader = new Bref3Header(source, dataIn, sampleFilter);
+        this.program = brefHeader.program();
+        this.includedHapIndices = brefHeader.filteredHapIndices();
+        this.invIncludedHapIndices = brefHeader.invfilteredHapIndices();
+        this.samples = brefHeader.samples();
+        this.byteBuffer = new byte[2*invIncludedHapIndices.length];
+        this.hapToSeq = new char[includedHapIndices.length];
         this.markerFilter = markerFilter;
-        this.nHaps = 2*samples.size();
-        this.byteBuffer = new byte[2*nHaps];
     }
 
     /**
@@ -106,14 +122,6 @@ public final class Bref3Reader {
      */
     String program() {
         return program;
-    }
-
-    /**
-     * Returns the marker filter
-     * @return the marker filter
-     */
-    Filter<Marker> markerFilter() {
-        return markerFilter;
     }
 
     /**
@@ -141,26 +149,26 @@ public final class Bref3Reader {
         }
     }
 
-    private void readBlock(DataInput bref, Collection<RefGTRec> buffer,
+    private void readBlock(DataInput dataIn, Collection<RefGTRec> buffer,
             int nRecs) throws IOException {
         assert nRecs!= 0;
-        String chrom = readString(bref);
+        String chrom = dataIn.readUTF();
         int chromIndex = ChromIds.instance().getIndex(chrom);
-        int nSeq = bref.readUnsignedShort();
-        bref.readFully(byteBuffer);
-        IntArray hapToSeq = new CharArray(byteBuffer);
+        int nSeq = dataIn.readUnsignedShort();
+        dataIn.readFully(byteBuffer);
+        IntArray hapToSeq = hapToSeq(byteBuffer);
         for (int j=0; j<nRecs; ++j) {
-            Marker marker = readMarker(bref, chromIndex);
-            byte flag = bref.readByte();
+            Marker marker = readMarker(dataIn, chromIndex);
+            byte flag = dataIn.readByte();
             if (flag==0) {
-                RefGTRec rec = readHapRecord(bref, marker, samples,
+                RefGTRec rec = readHapRecord(dataIn, marker, samples,
                         hapToSeq, nSeq);
                 if (markerFilter.accept(marker)) {
                     buffer.add(rec);
                 }
             }
             else if (flag==1) {
-                RefGTRec rec = readAlleleRecord(bref, marker, samples);
+                RefGTRec rec = readAlleleRecord(dataIn, marker, samples);
                 if (markerFilter.accept(marker)) {
                     buffer.add(rec);
                 }
@@ -169,6 +177,16 @@ public final class Bref3Reader {
                 Utilities.exit(READ_ERR);
             }
         }
+    }
+
+    private IntArray hapToSeq(byte[] byteBuffer) {
+        for (int k=0; k<hapToSeq.length; ++k) {
+            int offset = (includedHapIndices[k]<<1);
+            int b1 = byteBuffer[offset] & 0xff;
+            int b2 = byteBuffer[offset+1] & 0xff;
+            hapToSeq[k] = (char) ((b1 << 8) + b2);
+        }
+        return new CharArray(hapToSeq);
     }
 
     private RefGTRec readHapRecord(DataInput bref, Marker marker,
@@ -182,15 +200,6 @@ public final class Bref3Reader {
 //        }
 
         return new HapRefGTRec(marker, samples, hapToSeq, seqToAllele);
-    }
-
-    private static void readAndCheckMagicNumber(DataInput di) throws IOException {
-        int magicNumber=di.readInt();
-        if (magicNumber!=AsIsBref3Writer.MAGIC_NUMBER_V3) {
-            String s = "ERROR: Unrecognized input file.  Was input file created "
-                    + Const.nl + "with a different version of the bref program?";
-            Utilities.exit(s);
-        }
     }
 
     private static Marker readMarker(DataInput dataIn, int chromIndex)
@@ -265,35 +274,32 @@ public final class Bref3Reader {
         return sb.toString();
     }
 
-    private static RefGTRec readAlleleRecord(DataInput di, Marker marker,
+    private RefGTRec readAlleleRecord(DataInput di, Marker marker,
             Samples samples) throws IOException {
         int nAlleles = marker.nAlleles();
         int[][] hapIndices = new int[nAlleles][];
         for (int j=0; j<nAlleles; ++j) {
-            hapIndices[j] = readIntArray(di);
+            hapIndices[j] = readAlleleCodedHapList(di);
         }
         return RefGTRec.alleleRefGTRec(marker, samples, hapIndices);
     }
 
-    private static int[] readIntArray(DataInput di) throws IOException {
-        int length = di.readInt();
+    private int[] readAlleleCodedHapList(DataInput dataInput) throws IOException {
+        int length = dataInput.readInt();
         if (length == -1) {
             return null;
         }
         else {
             int[] ia = new int[length];
-            byte[] ba = new byte[4*length]; // will overflow if 4*length >= 2^31
-            di.readFully(ba);
-            for (int j=0; j<ba.length; j+=4) {
-                ia[j/4] = (((ba[j] & 0xff) << 24) | ((ba[j+1] & 0xff) << 16) |
-                            ((ba[j+2] & 0xff) << 8) | (ba[j+3] & 0xff));
+            int index = 0;
+            for (int j=0; j<ia.length; ++j) {
+                int hap = dataInput.readInt();
+                if (invIncludedHapIndices[hap]>=0) {
+                    ia[index++] = invIncludedHapIndices[hap];
+                }
             }
-            return ia;
+            return index<ia.length ? Arrays.copyOf(ia, index) : ia;
         }
-    }
-
-    private static String readString(DataInput di) throws IOException {
-        return di.readUTF();
     }
 
     private static String readByteLengthStringArrayAndJoin(DataInput dataIn,
@@ -320,7 +326,7 @@ public final class Bref3Reader {
     }
 
     /* Returns null if length is negative */
-    private static String[] readStringArray(DataInput di, int length)
+    private static String[] readStringArray(DataInput dataIn, int length)
             throws IOException {
         if (length<0) {
             return null;
@@ -329,7 +335,7 @@ public final class Bref3Reader {
         } else {
             String[] sa=new String[length];
             for (int j=0; j<sa.length; ++j) {
-                sa[j]=readString(di);
+                sa[j]=dataIn.readUTF();
             }
             return sa;
         }

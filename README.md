@@ -1,12 +1,12 @@
 # ibd-cluster
 
-The **ibd-cluster** program uses multi-individual identity by descent to 
-cluster haplotypes. Haplotypes in the same cluster at a genomic position 
+The **ibd-cluster** program uses multi-individual identity by descent to
+cluster haplotypes. Haplotypes in the same cluster at a genomic position
 are identical by descent at that position.
 
 The **ibd-cluster** program can analyze biobank-scale sequence data.
 
-Last updated: November 6, 2023  
+Last updated: November 6, 2023
 Current version: 0.1.0
 
 ## Contents
@@ -54,7 +54,7 @@ You can run an **ibd-cluster** analysis with the command:
 
 where **[GB]** is the maximum number of gigabytes of memory to use, and
 **[arguments]** is a space-separated list of parameter values, each expressed as
-**parameter=value**.  If a Java out of memory error occurs, you probably will 
+**parameter=value**.  If a Java out of memory error occurs, you probably will
 need to increase the Java -Xmx parameter.
 
 The shell script
@@ -66,16 +66,19 @@ runs a test **ibd-cluster** analysis.
 ### Required parameters
 
 The **ibd-cluster** program has three required parameters. All other parameters
-are optional and have reasonable default values.  Input files having a name 
+are optional and have reasonable default values.  Input files having a name
 ending in ".gz" are assumed to be gzip-compressed.
 
-* **gt=[file]** where **[file]** is a 
+* **gt=[file]** where **[file]** is a
 [Variant Call Format](https://faculty.washington.edu/browning/intro-to-vcf.html)
-(VCF) that contains phased, nonmissing genotype data for each individual. 
+(VCF) that contains phased, nonmissing genotype data for each individual.
 If the VCF file has unphased or sporadic missing genotypes, you can phase and
 impute the genotypes using the
-[Beagle](https://faculty.washington.edu/browning/beagle/beagle.html) program 
-before running **ibd-cluster**.
+[Beagle](https://faculty.washington.edu/browning/beagle/beagle.html) program
+before running **ibd-cluster**.  If the VCF filename ends in ".bref3", it is
+assumed to be bref3-compressed.  Software for bref3 compression and
+decompression can be downloaded from the
+[Beagle web site](https://faculty.washington.edu/browning/beagle/beagle.html).
 
 * **map=[file]** where **[file]** is a
 [PLINK format genetic map](https://zzz.bwh.harvard.edu/plink/data.shtml#map)
@@ -115,8 +118,8 @@ The **length** parameter must be at least twice as large as the **trim**
 parameter. See the **length** parameter for more information.
 
 * **min-maf=[number < 0.5]** specifies the minimum minor allele frequency
-(**default: min-maf=0.1**). Markers with minor allele frequency less than 
-**min-maf** will be ignored. For multi-allelic markers, the minor allele 
+(**default: min-maf=0.1**). Markers with minor allele frequency less than
+**min-maf** will be ignored. For multi-allelic markers, the minor allele
 frequency is the second-largest allele frequency.
 
 * **aggregate=[number > 0.0]** specifies the maximum cM length of a
@@ -154,7 +157,7 @@ sample identifiers. These columns contain two haplotype clusters for each
 individual at each position.
 
 An individual's two haplotype clusters are separated by a vertical bar ('|').
-The first and second haplotype clusters respectively contain the individual's 
+The first and second haplotype clusters respectively contain the individual's
 first and second haplotypes in the input VCF file.
 The haplotype clusters at each position are indexed by consecutive integers
 starting with 0. Haplotypes with the same cluster index at a position are
@@ -177,11 +180,11 @@ If you use **ibd-cluster** in a published analysis, please report the program
 version printed in the **log** file and cite the article describing
 the **ibd-cluster** method:
 
-> S R Browning, B L Browning (2023). Biobank-scale inference of multi-individual 
-identity by descent and gene conversion.  bioRxiv 2023.11.03.565574; 
+> S R Browning, B L Browning (2023). Biobank-scale inference of multi-individual
+identity by descent and gene conversion.  bioRxiv 2023.11.03.565574;
 doi: https://doi.org/10.1101/2023.11.03.565574
 
-[Sharon Browning](https://sites.uw.edu/sguy/) developed the **ibd-cluster** clustering method.  
+[Sharon Browning](https://sites.uw.edu/sguy/) developed the **ibd-cluster** clustering method.
 [Brian Browning](https://faculty.washington.edu/browning) developed the **ibd-cluster** algorithms and software.
 
 [Contents](#contents)
