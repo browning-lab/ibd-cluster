@@ -6,8 +6,8 @@ are identical by descent at that position.
 
 The **ibd-cluster** program can analyze biobank-scale sequence data.
 
-Last updated: November 6, 2023  
-Current version: 0.1.0
+Last updated: November 16, 2023  
+Current version: 0.1.1
 
 ## Contents
 
