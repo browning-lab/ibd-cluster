@@ -36,8 +36,8 @@ import java.util.Locale;
 public class ClustMain {
 
     private static final String EXECUTABLE = "ibd-cluster.jar";
-    private static final String REVISION = "ibd-cluster.__REV__.jar";
-    private static final String PROGRAM = EXECUTABLE + "  [ version 0.1.1, __REV__ ]";
+    private static final String REVISION = "ibd-cluster.16Nov23.1f3.jar";
+    private static final String PROGRAM = EXECUTABLE + "  [ version 0.1.1, 16Nov23.1f3 ]";
     private static final String COPYRIGHT = "Copyright (C) 2023 Brian L. Browning";
     static final String COMMAND = "java -jar " + EXECUTABLE;
 
