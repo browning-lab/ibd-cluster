@@ -7,8 +7,8 @@ biobank data with hundreds of thousands of individuals.
 Version 0.2 of **ibd-cluster** incorporates a probabilistic model and
 is more accurate than version 0.1
 
-Last updated February 27, 2025
-Current version: 0.2.0
+Last updated: February 27, 2025  
+Version: 0.2.0
 
 ## Contents
 
@@ -187,7 +187,7 @@ of the sample's two haplotypes in the input VCF file.
 ## License
 The **ibd-cluster** program is licensed under the Apache License, Version 2.0
 (the License). You may obtain a copy of the License from
-[http://www.apache.org/licenses/LICENSE-2.0]([http://www.apache.org/licenses/LICENSE-2.0]).
+[http://www.apache.org/licenses/LICENSE-2.0](http://www.apache.org/licenses/LICENSE-2.0).
 
 [Back to Contents](#contents)
 
