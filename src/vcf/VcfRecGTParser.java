@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Brian L. Browning
+ * Copyright 2023-2025 Brian L. Browning
  *
  * This file is part of the ibd-cluster program.
  *
@@ -59,23 +59,38 @@ public final class VcfRecGTParser {
      * record.
      * @param vcfHeader the VCF meta-information lines and header line
      * @param vcfRec the VCF record
-     * @param filter a filter for a VCF record's ID, QUAL, FILTER, and
-     * INFO subfields
      * @throws IllegalArgumentException if {@code vcfHeader.size() == 0}
      * @throws IllegalArgumentException if a format error is detected in the
      * {@code vcfRecord}
      * @throws NullPointerException if
-     * {@code (vcfHeader == null) || (vcfRec == null) || (filter == null}}
+     * {@code (vcfHeader == null) || (vcfRec == null)}
+     */
+    public VcfRecGTParser(VcfHeader vcfHeader, String vcfRec) {
+        this(vcfHeader, vcfRec, false);
+    }
+
+    /**
+     * Constructs a new {@code VcfRecGTParser} object from the specified VCF
+     * record.
+     * @param vcfHeader the VCF meta-information lines and header line
+     * @param vcfRec the VCF record
+     * @param stripOptionalFields {@code true} if the VCF record's ID,
+     * QUAL, FILTER, and INFO subfields should be discarded
+     * @throws IllegalArgumentException if {@code vcfHeader.size() == 0}
+     * @throws IllegalArgumentException if a format error is detected in the
+     * {@code vcfRecord}
+     * @throws NullPointerException if
+     * {@code (vcfHeader == null) || (vcfRec == null)}
      */
     public VcfRecGTParser(VcfHeader vcfHeader, String vcfRec,
-            VcfFieldFilter filter) {
+            boolean stripOptionalFields) {
         if (vcfHeader.nSamples()==0) {
             throw new IllegalArgumentException("nSamples==0");
         }
         this.vcfHeader = vcfHeader;
         this.samples = vcfHeader.samples();
         this.vcfRec = vcfRec;
-        this.marker = new Marker(vcfRec, filter);
+        this.marker = Marker.fromVcfRecord(vcfRec, stripOptionalFields);
         this.nAlleles = marker.nAlleles();
         this.nSamples = vcfHeader.nSamples();
         this.ninthTabPos = ninthTabPos(vcfRec);

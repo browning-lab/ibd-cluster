@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Brian L. Browning
+ * Copyright 2023-2025 Brian L. Browning
  *
  * This file is part of the ibd-cluster program.
  *
@@ -20,6 +20,7 @@ package vcf;
 import beagleutil.ChromInterval;
 import blbutil.Const;
 import blbutil.SampleFileIt;
+import blbutil.VcfFileIt;
 import java.io.File;
 import java.util.NoSuchElementException;
 
@@ -31,20 +32,19 @@ import java.util.NoSuchElementException;
  *
  * @author Brian L. Browning {@code <browning@uw.edu>}
  */
-public final class IntervalVcfIt<E extends GTRec> implements SampleFileIt<E> {
+public final class IntervalVcfIt<E extends GTRec> implements VcfFileIt<E> {
 
-    private final SampleFileIt<E> it;
+    private final VcfFileIt<E> it;
     private final ChromInterval interval;
     private E next;
 
     /**
      * Constructs a new {@code IntervalVcfIterator} instance.
-     * @param it an iterator whose {@code next()} method returns a marker
-     * container
+     * @param it an iterator which returns VCF records
      * @param chromInt a chromosome interval
      * @throws NullPointerException if {@code it == null || interval == null}
      */
-    public IntervalVcfIt(SampleFileIt<E> it, ChromInterval chromInt) {
+    public IntervalVcfIt(VcfFileIt<E> it, ChromInterval chromInt) {
         E firstRecord = readFirstRecord(it, chromInt);
         if (firstRecord==null) {
             String s = "No VCF records found in the specified interval."
@@ -60,6 +60,11 @@ public final class IntervalVcfIt<E extends GTRec> implements SampleFileIt<E> {
     @Override
     public File file() {
         return it.file();
+    }
+
+    @Override
+    public VcfHeader vcfHeader() {
+        return it.vcfHeader();
     }
 
     @Override

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Brian L. Browning
+ * Copyright 2023-2025 Brian L. Browning
  *
  * This file is part of the ibd-cluster program.
  *
@@ -20,7 +20,7 @@ package blbutil;
 import vcf.Samples;
 
 /**
- * <p>An iterator for records in a file.  Each records contains
+ * <p>An iterator for records in a file.  Each record contains
  * data for the same set of samples.
  *</p>
  * Instances of class {@code SampleFileIt} are not thread-safe.

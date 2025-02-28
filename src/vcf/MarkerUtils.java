@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Brian L. Browning
+ * Copyright 2023-2025 Brian L. Browning
  *
  * This file is part of the ibd-cluster program.
  *
@@ -22,10 +22,6 @@ import blbutil.Const;
 import blbutil.StringUtil;
 import blbutil.Utilities;
 import ints.IntList;
-import java.io.DataInput;
-import java.io.DataOutput;
-import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -70,10 +66,10 @@ public final class MarkerUtils  {
     /**
      * Returns
      * {@code (marker.chrom() + ':' + marker.pos() + ':'
-     * + marker.refAlt().replace(Const.tab, Const.colon))}.
+     * + marker.alleles().replace(Const.tab, Const.colon))}.
      * @param marker a marker
      * @return {{@code (marker.chrom() + ':' + marker.pos() + ':'
-     *          + marker.refAlt().replace(Const.tab, Const.colon))}
+     * + marker.alleles().replace(Const.tab, Const.colon))}
      * @throws NullPointerException if {@code marker == null}
      */
     public static String coordinateAndAlleles(Marker marker) {
@@ -81,7 +77,7 @@ public final class MarkerUtils  {
         sb.append(Const.colon);
         sb.append(marker.pos());
         sb.append(Const.colon);
-        sb.append(marker.refAlt().replace(Const.tab, Const.colon));
+        sb.append(marker.alleles().replace(Const.tab, Const.colon));
         return sb.toString();
     }
 
@@ -93,11 +89,12 @@ public final class MarkerUtils  {
      * @throws NullPointerException if {@code marker == null}
      */
     public static String[] ids(Marker marker) {
-        if (marker.hasIdData()) {
-            return StringUtil.getFields(marker.id(), Const.semicolon);
+        String id = marker.id();
+        if (id.equals(Const.MISSING_DATA_STRING)) {
+            return EMPTY_ID_ARRAY;
         }
         else {
-            return EMPTY_ID_ARRAY;
+            return StringUtil.getFields(marker.id(), Const.semicolon);
         }
     }
 
@@ -109,7 +106,7 @@ public final class MarkerUtils  {
      * @throws NullPointerException if {@code marker == null}
      */
     public static String[] alleles(Marker marker) {
-        String refAlt = marker.refAlt();
+        String refAlt = marker.alleles();
         int nAlleles = marker.nAlleles();
         String[] alleles = new String[nAlleles];
         int start = 0;
@@ -122,50 +119,6 @@ public final class MarkerUtils  {
                     : refAlt.substring(startIndex, endIndex);
         }
         return alleles;
-    }
-
-    /**
-     * Prints the first seven tab-delimited VCF fields for the specified
-     * marker to the specified {@code PrintWriter}. The delimiter preceding
-     * the 8-th VCF field (the INFO field) is not appended.
-     * @param marker a marker
-     * @param out the {@code PrintWriter} that will receive output
-     * @throws NullPointerException if {@code (marker == null) || (out == null)}
-     */
-    public static void printFirst7Fields(Marker marker, PrintWriter out) {
-        out.print(marker.chrom());
-        out.print(Const.tab);
-        out.print(marker.pos());
-        out.print(Const.tab);
-        out.print(marker.id());
-        out.print(Const.tab);
-        out.print(marker.refAlt());
-        out.print(Const.tab);
-        out.print(marker.qual());
-        out.print(Const.tab);
-        out.print(marker.filter());
-    }
-
-    /**
-     * Appends the first seven tab-delimited VCF fields for the specified
-     * marker to the specified {@code StringBuilder}. The delimiter preceding
-     * the 8-th field (the INFO field) is not appended.
-     * @param marker a marker
-     * @param sb the {@code StringBuilder} that will be appended
-     * @throws NullPointerException if {@code (marker == null) || (sb == null)}
-     */
-    public static void appendFirst7Fields(Marker marker, StringBuilder sb) {
-        sb.append(marker.chrom());
-        sb.append(Const.tab);
-        sb.append(marker.pos());
-        sb.append(Const.tab);
-        sb.append(marker.id());
-        sb.append(Const.tab);
-        sb.append(marker.refAlt());
-        sb.append(Const.tab);
-        sb.append(marker.qual());
-        sb.append(Const.tab);
-        sb.append(marker.filter());
     }
 
     /**
@@ -199,8 +152,8 @@ public final class MarkerUtils  {
             index = vcfRec.indexOf(Const.tab, index+1);
         }
         if (indices.size() < nTabs) {
-            String s = "VCF record does not contain " + nTabs + " tabs:"
-                    + truncate(vcfRec, 800);
+            String s = "VCF record does not contain at least " + nTabs + " tabs:"
+                    + truncate(vcfRec, 200);
             throw new IllegalArgumentException(s);
         }
         return indices;
@@ -218,7 +171,7 @@ public final class MarkerUtils  {
      * @throws IllegalArgumentException if {@code chrom} contains
      * a whitespace character.
      * @throws IndexOutOfBoundsException if
-     * {@code ChromIds.instance().getIndex(chrom) >= Short.MAX_VALUE}.
+     * {@code ChromIds.instance().getIndex(chrom) >= Marker.MAX_CHROMOSOMES
      */
     static short chromIndex(String vcfRec, String chrom) {
         if (chrom.isEmpty()
@@ -235,7 +188,7 @@ public final class MarkerUtils  {
             }
         }
         int chrIndex = ChromIds.instance().getIndex(chrom);
-        if (chrIndex>=Short.MAX_VALUE) {
+        if (chrIndex>=Marker.MAX_CHROMOSOMES) {
             throw new IndexOutOfBoundsException(String.valueOf(chrIndex));
         }
         return (short) chrIndex;
@@ -252,7 +205,7 @@ public final class MarkerUtils  {
         Arrays.sort(bases);
         List<String> perms = new ArrayList<>(120);
         permute(new char[0], bases, perms);
-        // next add monomorphic markers
+        // Add markers without ALT allele
         perms.add("A\t.");
         perms.add("C\t.");
         perms.add("G\t.");

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Brian L. Browning
+ * Copyright 2023-2025 Brian L. Browning
  *
  * This file is part of the ibd-cluster program.
  *
@@ -239,7 +239,7 @@ public class SeqCoder3 {
             }
         }
         addMajorAllele(seq2NonMajorCnt, majorAllele);
-        if (seq2AlleleSeqMap.size() >= maxNSeq) {
+        if (seq2AlleleSeqMap.size() > maxNSeq) {
             seq2AlleleSeqMap.subList(nStartSeq, seq2AlleleSeqMap.size()).clear();
             return false;
         }

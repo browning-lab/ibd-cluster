@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Brian L. Browning
+ * Copyright 2023-2025 Brian L. Browning
  *
  * This file is part of the ibd-cluster program.
  *
@@ -18,9 +18,7 @@
 package vcf;
 
 import blbutil.FileIt;
-import blbutil.Filter;
-import blbutil.SampleFileIt;
-import blbutil.TriFunction;
+import blbutil.VcfFileIt;
 import java.io.File;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -28,7 +26,9 @@ import java.util.Arrays;
 import java.util.Deque;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -45,15 +45,13 @@ import java.util.stream.IntStream;
  *
  * @author Brian L. Browning {@code <browning@uw.edu>}
  */
-public class VcfIt<E extends GTRec> implements SampleFileIt<E> {
-
-    private static final float DEFAULT_MAX_LR = Float.MAX_VALUE;
+public class VcfIt<E extends GTRec> implements VcfFileIt<E> {
 
     private final VcfHeader vcfHeader;
     private final FileIt<String> it;
     private final Function<String, E> mapper;
     private String next;
-    private final Filter<Marker> markerFilter;
+    private final Predicate<Marker> markerFilter;
 
     private final int bufferSize;
     private final String[] stringBuffer;
@@ -65,45 +63,75 @@ public class VcfIt<E extends GTRec> implements SampleFileIt<E> {
     public static final int DEFAULT_BUFFER_SIZE = 1<<10;
 
    /**
-     * A function mapping a string VCF record with GT format fields
+     * A function mapping a string VCF record with a FORMAT/GT field
      * to a memory-efficient {@code GTRec} object. Phase status is stored
      * per record.  All genotypes are considered to be unphased if any
      * genotype is unphased or if any allele is missing.
      */
-    public static final TriFunction<VcfHeader, String, VcfFieldFilter, GTRec> TO_LOWMEM_GT_REC
-            = (VcfHeader h, String s, VcfFieldFilter f) -> {
-                VcfRecGTParser.HapListRep hlr = new VcfRecGTParser(h, s, f)
-                        .hapListRep();
-                int nonMajorAlleleThreshold = (hlr.samples().size()>>7);
-                if (hlr.nonmajorAlleleCnt()<=nonMajorAlleleThreshold) {
-                    if (hlr.marker().nAlleles()==2) {
-                        LowMafDiallelicGTRec rec = new LowMafDiallelicGTRec(hlr);
-                        return rec;
-                    }
-                    else {
-                        LowMafGTRec rec = new LowMafGTRec(hlr);
-                        return rec;
-                    }
-                }
-                else {
-                    BitArrayGTRec rec = new BitArrayGTRec(hlr);
-                    return rec;
-                }
+    public static final BiFunction<VcfHeader, String, GTRec> TO_LOWMEM_GT_REC
+            = (VcfHeader h, String vcfRec) -> {
+                return lowMemGTRec(new VcfRecGTParser(h, vcfRec, false));
             };
 
    /**
-     * A function mapping a string VCF record with GT format fields
-     * to a {@code GTRec} object. Phase status is stored per-genotype.
+     * A function that strips the VCF ID, QUAL, FILTER, and INFO, and FORMAT
+     * fields from a VCF record with a FORMAT/GT field and maps the
+     * stripped VCF record to a memory-efficient {@code GTRec} object.
+     * Phase status is stored per VCF record.  All genotypes are considered
+     * to be unphased if any genotype is unphased or if any allele is missing.
      */
-    public static final TriFunction<VcfHeader, String, VcfFieldFilter, GTRec> TO_BASIC_GT_REC
-        = (VcfHeader h, String s, VcfFieldFilter f) -> new BasicGTRec(new VcfRecGTParser(h, s, f));
+    public static final BiFunction<VcfHeader, String, GTRec> TO_STRIPPED_LOWMEM_GT_REC
+        = (VcfHeader h, String vcfRec) -> {
+            return lowMemGTRec(new VcfRecGTParser(h, vcfRec, true));
+        };
+
+        private static GTRec lowMemGTRec(VcfRecGTParser recParser) {
+            VcfRecGTParser.HapListRep hlr = recParser.hapListRep();
+            int nonMajorAlleleThreshold = (hlr.samples().size()>>7);
+            if (hlr.nonmajorAlleleCnt()<=nonMajorAlleleThreshold) {
+                if (hlr.marker().nAlleles()==2) {
+                    return new LowMafDiallelicGTRec(hlr);
+                }
+                else {
+                    return new LowMafGTRec(hlr);
+                }
+            }
+            else {
+                return new BitArrayGTRec(hlr);
+            }
+        }
+
+   /**
+     * A function mapping a string VCF record with a FORMAT/GT field
+     * to a {@code BasicGTRec} object. Phase status is stored per-genotype.
+     */
+    public static final BiFunction<VcfHeader, String, GTRec> TO_BASIC_GT_REC
+        = (VcfHeader h, String vcfRec) -> new BasicGTRec(new VcfRecGTParser(h, vcfRec, false));
+
+   /**
+     * A function that strips the VCF ID, QUAL, FILTER, and INFO, and FORMAT
+     * fields from a VCF record with a FORMAT/GT field and maps the
+     * stripped VCF record to a {@code BasicGTRec} object. Phase status is
+     * stored per-genotype.
+     */
+    public static final BiFunction<VcfHeader, String, GTRec> TO_STRIPPED_BASIC_GT_REC
+        = (VcfHeader h, String vcfRec) -> new BasicGTRec(new VcfRecGTParser(h, vcfRec, true));
 
     /**
-     * A function mapping a string VCF record with GT or GL format fields
-     * to a {@code VcfRecord} object.
+     * A function mapping a string VCF record with a FORMAT/GT field to
+     * a {@code VcfRec} object.
      */
-    public static final TriFunction<VcfHeader, String, VcfFieldFilter, VcfRec> TO_VCF_REC
-            = (VcfHeader h, String s, VcfFieldFilter f) -> VcfRec.fromGTGL(h, s, f, DEFAULT_MAX_LR);
+    public static final BiFunction<VcfHeader, String, VcfRec> TO_VCF_REC
+            = (VcfHeader h, String vcfRec) -> new VcfRec(h, vcfRec, false);
+
+   /**
+     * A function that strips the VCF ID, QUAL, FILTER, and INFO, and FORMAT
+     * fields from a VCF record with a FORMAT/GT field and maps the stripped
+     * VCF record to a {@code VcfRec} object. Phase status is stored
+     * per-genotype.
+     */
+    public static final BiFunction<VcfHeader, String, VcfRec> TO_STRIPPED_VCF_REC
+            = (VcfHeader h, String vcfRec) -> new VcfRec(h, vcfRec, true);
 
     /**
      * Returns an array containing VCF meta-information lines, the
@@ -148,9 +176,9 @@ public class VcfIt<E extends GTRec> implements SampleFileIt<E> {
      * {@code strIt == null || mapFactory == null}
      */
     public static <R extends GTRec> VcfIt<R> create(
-            FileIt<String> strIt, TriFunction<VcfHeader, String, VcfFieldFilter, R> recMapper) {
-        return VcfIt.create(strIt, Filter.acceptAllFilter(),
-                Filter.acceptAllFilter(), recMapper);
+            FileIt<String> strIt, BiFunction<VcfHeader, String, R> recMapper) {
+        return VcfIt.create(strIt, FilterUtil.acceptAllPredicate(),
+                FilterUtil.acceptAllPredicate(), recMapper);
     }
 
     /**
@@ -169,9 +197,9 @@ public class VcfIt<E extends GTRec> implements SampleFileIt<E> {
      * {@code strIt == null || mapFactory == null}
      */
     public static <R extends GTRec> VcfIt<R> create(
-            FileIt<String> strIt, Filter<String> sampleFilter,
-            Filter<Marker> markerFilter,
-            TriFunction<VcfHeader, String, VcfFieldFilter, R> recMapper) {
+            FileIt<String> strIt, Predicate<String> sampleFilter,
+            Predicate<Marker> markerFilter,
+            BiFunction<VcfHeader, String, R> recMapper) {
         return VcfIt.create(strIt, sampleFilter, markerFilter, recMapper,
                 DEFAULT_BUFFER_SIZE);
     }
@@ -194,33 +222,31 @@ public class VcfIt<E extends GTRec> implements SampleFileIt<E> {
      * {@code strIt == null || mapFactory == null}
      */
     public static <R extends GTRec> VcfIt<R> create(
-            FileIt<String> strIt, Filter<String> sampleFilter,
-            Filter<Marker> markerFilter,
-            TriFunction<VcfHeader, String, VcfFieldFilter, R> recMapper, int bufferSize) {
+            FileIt<String> strIt, Predicate<String> sampleFilter,
+            Predicate<Marker> markerFilter,
+            BiFunction<VcfHeader, String, R> recMapper, int bufferSize) {
         return new VcfIt<>(strIt, sampleFilter, markerFilter,
                 recMapper, bufferSize);
     }
 
-    private VcfIt(FileIt<String> it, Filter<String> sampleFilter,
-            Filter<Marker> markerFilter,
-            TriFunction<VcfHeader, String, VcfFieldFilter, E> recMapper,
+    private VcfIt(FileIt<String> it, Predicate<String> sampleFilter,
+            Predicate<Marker> markerFilter,
+            BiFunction<VcfHeader, String, E> recMapper,
             int bufferSize) {
         if (bufferSize < 1) {
             throw new IllegalArgumentException(String.valueOf(bufferSize));
         }
         if (markerFilter==null) {
-            markerFilter = Filter.acceptAllFilter();
+            markerFilter = FilterUtil.acceptAllPredicate();
         }
         String src = it.file()==null ? "stdin" : it.file().getName();
         String[] head = head(src, it);
         String[] nonDataLines = Arrays.copyOf(head, head.length-1);
         String firstDataLine = head[head.length-1];
         boolean[] isDiploid = VcfHeader.isDiploid(firstDataLine);
-        boolean storeId = true;
-        VcfFieldFilter fieldFilter = new VcfFieldFilter(storeId, false, false, false);
         this.it = it;
         this.vcfHeader = new VcfHeader(src, nonDataLines, isDiploid, sampleFilter);
-        this.mapper = (String s) -> recMapper.apply(vcfHeader, s, fieldFilter);
+        this.mapper = (String s) -> recMapper.apply(vcfHeader, s);
         this.next = firstDataLine;
         this.markerFilter = markerFilter;
         this.bufferSize = bufferSize;
@@ -246,7 +272,7 @@ public class VcfIt<E extends GTRec> implements SampleFileIt<E> {
                         .parallel()
                         .mapToObj(j -> stringBuffer[j])
                         .map(mapper)
-                        .filter(e -> markerFilter.accept(e.marker()))
+                        .filter(e -> markerFilter.test(e.marker()))
                         .collect(Collectors.toList());
                 recBuffer.addAll(list);
             }
@@ -328,6 +354,11 @@ public class VcfIt<E extends GTRec> implements SampleFileIt<E> {
     @Override
     public Samples samples() {
         return vcfHeader.samples();
+    }
+
+    @Override
+    public VcfHeader vcfHeader() {
+        return vcfHeader;
     }
 
     @Override

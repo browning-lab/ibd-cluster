@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Brian L. Browning
+ * Copyright 2023-2025 Brian L. Browning
  *
  * This file is part of the ibd-cluster program.
  *
@@ -93,6 +93,7 @@ public final class ChromInterval implements IntInterval,
      * [chrom]:[start]-[end]
      * [chrom]
      * [chrom]:
+     * [chrom]:[start]
      * [chrom]:[start]-
      * [chrom]:-[end]
      * </pre>
@@ -132,9 +133,12 @@ public final class ChromInterval implements IntInterval,
         else if (chrDelim == length-1) {
             return new ChromInterval(str.substring(0, length-1), start, end);
         }
+        else if ((posDelim == -1) && isValidPos(str, chrDelim+1, length)) {
+            start = Integer.parseInt(str.substring(chrDelim+1, length));
+            end = start;
+        }
         else {
-            if ( (posDelim == -1) || (posDelim <= chrDelim)
-                        || (chrDelim == length-2)
+            if ((posDelim <= chrDelim)
                         || (isValidPos(str, chrDelim+1, posDelim)==false)
                         || (isValidPos(str, posDelim+1, length)==false) ) {
                 return null;
@@ -153,17 +157,17 @@ public final class ChromInterval implements IntInterval,
     }
 
     /* endIndex is exclusive */
-    private static boolean isValidPos(String s, int startIndex,
+    private static boolean isValidPos(String str, int startIndex,
             int endIndex) {
         if (startIndex==endIndex) {
             return true;
         }
         int length = endIndex - startIndex;
-        if ((length > 1) && s.charAt(startIndex)==0) {
+        if ((length > 1) && str.charAt(startIndex)==0) {
             return false;
         }
         for (int j=startIndex; j<endIndex; ++j) {
-            char c = s.charAt(j);
+            char c = str.charAt(j);
             if (Character.isDigit(c)==false) {
                 return false;
             }

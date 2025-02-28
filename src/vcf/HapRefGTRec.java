@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Brian L. Browning
+ * Copyright 2023-2025 Brian L. Browning
  *
  * This file is part of the ibd-cluster program.
  *
@@ -17,7 +17,6 @@
  */
 package vcf;
 
-import bref4.BrefRec;
 import ints.IndexArray;
 import ints.IntArray;
 import java.util.Arrays;
@@ -150,7 +149,7 @@ public class HapRefGTRec implements RefGTRec {
 
     @Override
     public int nAlleleCodedHaps() {
-        return BrefRec.nonNullCnt(alleleToHaps());
+        return RefGTRec.nonNullCnt(alleleToHaps());
     }
 
     @Override
@@ -215,16 +214,14 @@ public class HapRefGTRec implements RefGTRec {
     }
 
     /**
-     * Returns the data represented by {@code this} as a VCF
-     * record with a GT format field. The returned VCF record
-     * will have missing QUAL and INFO fields, will have "PASS"
-     * in the filter field, and will have a GT format field.
-     * @return the data represented by {@code this} as a VCF
-     * record with a GT format field
+     * Returns the data represented by {@code this} as a string VCF record
+     * with correct INFO/AN and INFO/AC fields and with FORMAT/GT as the
+     * only FORMAT field.
+     * @return the data represented by {@code this} as a string VCF record
      */
     @Override
     public String toString() {
-        return GTRec.toVcfRec(this);
+        return RefGTRec.toString(this);
     }
 
     @Override

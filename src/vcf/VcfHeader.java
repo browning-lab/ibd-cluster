@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Brian L. Browning
+ * Copyright 2023-2025 Brian L. Browning
  *
  * This file is part of the ibd-cluster program.
  *
@@ -18,12 +18,12 @@
 package vcf;
 
 import blbutil.Const;
-import blbutil.Filter;
 import blbutil.StringUtil;
 import blbutil.Utilities;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Predicate;
 
 /**
  * <p>Class {@code VcfHeader} represents the Variant Call Format (VCF)
@@ -38,19 +38,21 @@ import java.util.List;
 public final class VcfHeader  {
 
     /**
-     * A string equal to the first nine tab-delimited fields of a VCF header
-     * line that contains sample data.
+     * The VCF meta-information line prefix: "##"
+     */
+    public static final String META_INFO_PREFIX = "##";
+
+    /**
+     * The first nine tab-delimited fields of a VCF header line that contains
+     * sample data
      */
     public static final String HEADER_PREFIX =
-            "#CHROM" + Const.tab + "POS"
-            + Const.tab + "ID" + Const.tab + "REF" + Const.tab + "ALT"
-            + Const.tab + "QUAL" + Const.tab + "FILTER" + Const.tab + "INFO"
-            + Const.tab + "FORMAT";
+            "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT";
 
-    private static final int SAMPLE_OFFSET = 9;
+    private static final int FIRST_SAMPLE_FIELD = 9;
 
     private final String src;
-    private final VcfMetaInfo[] metaInfoLines;
+    private final String[] metaInfoLines;
     private final int nHeaderFields;
     private final int[] includedIndices;
     private final Samples samples;
@@ -99,13 +101,16 @@ public final class VcfHeader  {
      * @param isDiploid a boolean array whose {@code k}-th value is {@code true}
      * if the {@code k}-th sample is diploid, and is {@code false} if the
      * {@code k}-th sample is haploid
-     * @throws IllegalArgumentException if a format error is encountered
-     * in a meta-information line or header lines}
+     * @throws IllegalArgumentException if
+     * {@code (lines[j].trim().startsWith(META_INFO_PREFIX) == false)} for
+     * {@code ((0 <= j) && (j < (lines.length - 1)))}
+     * @throws IllegalArgumentException if
+     * {@code (lines[lines.length-1].trim().startsWith(HEADER_PREFIX) == false)}
      * @throws NullPointerException if
-     * {@code src==null || lines == null || isDiploid == nulle}
+     * {@code src==null || lines == null || isDiploid == null}
      */
     public VcfHeader(String src, String[] lines, boolean[] isDiploid) {
-        this(src, lines, isDiploid, Filter.acceptAllFilter());
+        this(src, lines, isDiploid, FilterUtil.acceptAllPredicate());
     }
 
     /**
@@ -117,26 +122,32 @@ public final class VcfHeader  {
      * @param isDiploid a boolean array whose {@code k}-th value is {@code true}
      * if the {@code k}-th sample is diploid, and is {@code false} if the
      * {@code k}-th sample is haploid
-     * @param sampleFilter a sample filter
+     * @param sampleFilter a sample filter or {@code null} if there
+     * are no sample exclusions
      * @throws IllegalArgumentException if a format error is encountered
      * in a meta-information line or header lines}
      * @throws NullPointerException if
      * {@code src==null || lines == null || isDiploid == null}
      */
     public VcfHeader(String src, String[] lines, boolean[] isDiploid,
-            Filter<String> sampleFilter) {
+            Predicate<String> sampleFilter) {
         if (src==null) {
             throw new NullPointerException(String.class.toString());
         }
         if (sampleFilter==null) {
-            sampleFilter = Filter.acceptAllFilter();
+            sampleFilter = FilterUtil.acceptAllPredicate();
         }
-        checkHeaderLines(lines, src);
+        checkHeaderLine(lines, src);
         int headerIndex = lines.length-1;
         this.src = src;
-        this.metaInfoLines = new VcfMetaInfo[headerIndex];
+        this.metaInfoLines = new String[headerIndex];
         for (int j=0; j<headerIndex; ++j) {
-            this.metaInfoLines[j] = new VcfMetaInfo(lines[j]);
+            this.metaInfoLines[j] = lines[j].trim();
+            if (metaInfoLines[j].startsWith(META_INFO_PREFIX)==false) {
+                String s = "Missing initial \"" + META_INFO_PREFIX
+                        + "\" in meta-information line: " + metaInfoLines[j];
+                throw new IllegalArgumentException(s);
+            }
         }
         String[] headerFields = StringUtil.getFields(lines[headerIndex], Const.tab);
         this.nHeaderFields = headerFields.length;
@@ -144,7 +155,7 @@ public final class VcfHeader  {
         this.samples = samples(headerFields, isDiploid, includedIndices);
     }
 
-    private static void checkHeaderLines(String[] lines, String src) {
+    private static void checkHeaderLine(String[] lines, String src) {
         if (lines.length==0) {
             String s = Const.nl + Const.nl
                     + "ERROR: Missing the VCF meta information lines and the VCF header line"
@@ -166,12 +177,12 @@ public final class VcfHeader  {
     }
 
     private static int[] includedIndices(String src, String[] headerFields,
-            Filter<String> sampleFilter) {
-        int nUnfilteredSamples = Math.max(headerFields.length - SAMPLE_OFFSET, 0);
+            Predicate<String> sampleFilter) {
+        int nUnfilteredSamples = Math.max(headerFields.length - FIRST_SAMPLE_FIELD, 0);
         int[] includedIndices = new int[nUnfilteredSamples];
         int index = 0;
         for (int j=0; j<nUnfilteredSamples; ++j) {
-            if (sampleFilter.accept(headerFields[SAMPLE_OFFSET + j])) {
+            if (sampleFilter.test(headerFields[FIRST_SAMPLE_FIELD + j])) {
                 includedIndices[index++] = j;
             }
         }
@@ -192,10 +203,10 @@ public final class VcfHeader  {
         String[] ids = new String[includedIndices.length];
         boolean[] restrictedIsDiploid = new boolean[includedIndices.length];
         for (int j=0; j<ids.length; ++j) {
-            ids[j] = headerFields[SAMPLE_OFFSET + includedIndices[j]];
+            ids[j] = headerFields[FIRST_SAMPLE_FIELD + includedIndices[j]];
             restrictedIsDiploid[j] = isDiploid[includedIndices[j]];
         }
-        return Samples.fromIds(ids, restrictedIsDiploid);
+        return new Samples(ids, restrictedIsDiploid);
     }
 
     /**
@@ -227,8 +238,16 @@ public final class VcfHeader  {
       * @throws IndexOutOfBoundsException if
       * {@code index < 0 || index >= this.nMetaInfoLines()}
       */
-     public VcfMetaInfo metaInfoLine(int index) {
+     public String metaInfoLine(int index) {
          return metaInfoLines[index];
+     }
+
+     /**
+      * Returns the VCF meta-information lines.
+      * @return the VCF meta-information lines
+      */
+     public String[] metaInfoLines() {
+         return metaInfoLines.clone();
      }
 
      /**
@@ -246,7 +265,7 @@ public final class VcfHeader  {
       * @return the number of samples before sample exclusions
       */
      public int nUnfilteredSamples() {
-         return Math.max(0, nHeaderFields - SAMPLE_OFFSET);
+         return Math.max(0, nHeaderFields - FIRST_SAMPLE_FIELD);
      }
 
      /**
@@ -287,10 +306,11 @@ public final class VcfHeader  {
     }
 
     /**
-     * Returns the VCF meta-information lines and the VCF header line after
-     * applying sample exclusions.
+     * Returns a {@code String} containing the VCF meta-information lines
+     * and the post-sample-filtering VCF header line. Each line in the
+     * {@code String} is terminated with a line separator.
      * @return the VCF meta-information lines and the VCF header line after
-     * applying sample exclusions.
+     * applying sample exclusions
      */
     @Override
     public String toString() {

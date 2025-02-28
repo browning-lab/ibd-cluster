@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Brian L. Browning
+ * Copyright 2023-2025 Brian L. Browning
  *
  * This file is part of the ibd-cluster program.
  *
@@ -69,8 +69,8 @@ public final class BGZipIt implements FileIt<String> {
     private final InputStream is;
     private final File source;
     private final int nBufferedBlocks;
-    private byte[] leftOverBytes;
     private final ArrayDeque<String> lines;
+    private byte[] leftOverBytes;
 
     /**
      * Constructs a new {@code BGZipIt} instance from the specified data
@@ -144,17 +144,17 @@ public final class BGZipIt implements FileIt<String> {
     }
 
     private void fillBuffer() {
-        while (lines.isEmpty()) {
-            byte[][] blocks = readAndInflateBlocks(is, leftOverBytes, nBufferedBlocks);
-            if (blocks.length == 0) {
-                return;
-            }
+        byte[][] blocks = readAndInflateBlocks(is, leftOverBytes, nBufferedBlocks);
+        if (blocks.length>0) {
             int[] eolIndices = IntStream.range(0, blocks.length)
                     .parallel()
                     .flatMap(j -> eolIndices(j, blocks[j]))
                     .toArray();
             leftOverBytes = leftOverBytes(blocks, eolIndices);
             addToLines(blocks, eolIndices, lines);
+            if (lines.isEmpty() && leftOverBytes.length>0) {
+                fillBuffer();
+            }
         }
     }
 
@@ -205,6 +205,7 @@ public final class BGZipIt implements FileIt<String> {
             merged = merge(blocks, 0, 0, block, endIndex);
         }
         else {
+            assert index>=2;
             int startBlock = eolIndices[index-2];
             int startIndex = eolIndices[index-1] + 1;
             merged = merge(blocks, startBlock, startIndex, block, endIndex);
@@ -245,22 +246,6 @@ public final class BGZipIt implements FileIt<String> {
         }
     }
 
-    private static byte[] inflateBlock(byte[] ba) {
-        ByteArrayOutputStream os = new ByteArrayOutputStream(ba.length);
-        byte[] buffer = new byte[1<<13];
-        try (ByteArrayInputStream bais = new ByteArrayInputStream(ba);
-                GZIPInputStream gzis = new GZIPInputStream(bais)) {
-            int bytesRead;
-            while ((bytesRead = gzis.read(buffer)) != -1) {
-                os.write(buffer, 0, bytesRead);
-            }
-        }
-        catch (IOException e) {
-            Utilities.exit(e);
-        }
-        return os.toByteArray();
-    }
-
     private static byte[][] readAndInflateBlocks(InputStream is, byte[] initialBytes, int nBlocks) {
         ArrayList<byte[]> compressedBlocks = new ArrayList<>(nBlocks);
         for (int j=0; j<nBlocks; ++j) {
@@ -276,7 +261,7 @@ public final class BGZipIt implements FileIt<String> {
                 .parallel()
                 .map(ba -> inflateBlock(ba))
                 .toArray(byte[][]::new);
-        if (initialBytes.length>0) {
+        if (blocks.length>0 && initialBytes.length>0) {
             int newLength = initialBytes.length + blocks[0].length;
             byte[] prependedBlock = Arrays.copyOf(initialBytes, newLength);
             System.arraycopy(blocks[0], 0, prependedBlock, initialBytes.length,
@@ -317,6 +302,22 @@ public final class BGZipIt implements FileIt<String> {
             Utilities.exit(e);
         }
         return ba;
+    }
+
+    private static byte[] inflateBlock(byte[] ba) {
+        ByteArrayOutputStream os = new ByteArrayOutputStream(ba.length);
+        byte[] buffer = new byte[1<<13];
+        try (ByteArrayInputStream bais = new ByteArrayInputStream(ba);
+                GZIPInputStream gzis = new GZIPInputStream(bais)) {
+            int bytesRead;
+            while ((bytesRead = gzis.read(buffer)) != -1) {
+                os.write(buffer, 0, bytesRead);
+            }
+        }
+        catch (IOException e) {
+            Utilities.exit(e);
+        }
+        return os.toByteArray();
     }
 
     /**

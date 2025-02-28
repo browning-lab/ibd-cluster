@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Brian L. Browning
+ * Copyright 2023-2025 Brian L. Browning
  *
  * This file is part of the ibd-cluster program.
  *
@@ -309,20 +309,18 @@ public class AsIsBref3Writer implements BrefWriter {
 
     private static int extractEnd(Marker marker) {
         String info = marker.info();
-        int index = 0;
+        int index = 4;  // start of base coordinate if info.startsWith("END=")==true
         if (info.startsWith("END=")==false) {
-            index = info.indexOf(";END=");
-        }
-        if (index == -1) {
-            return -1;
-        }
-        else {
-            int endIndex = info.indexOf(Const.semicolon, index+4);
-            if (endIndex == -1) {
-                endIndex = info.length();
+            index = info.indexOf(";END=") + 5;
+            if (index<5) {  // ";END=" not found
+                return -1;
             }
-            return Integer.parseInt(info.substring(index, endIndex));
         }
+        int endIndex = info.indexOf(Const.semicolon, index);
+        if (endIndex == -1) {
+            endIndex = info.length();
+        }
+        return Integer.parseInt(info.substring(index, endIndex));
     }
 
     private byte snvCode(String[] alleles) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Brian L. Browning
+ * Copyright 2023-2025 Brian L. Browning
  *
  * This file is part of the ibd-cluster program.
  *
@@ -227,7 +227,8 @@ public class InputIt implements FileIt<String> {
      * Constructs and returns a buffered {@code InputIt} instance that
      * iterates through lines of the specified compressed or uncompressed
      * text file. If the filename ends in ".gz", the file must be
-     * tGZIP-compressed.
+     * GZIP-compressed. The Java virtual machine will exit with an
+     * error message if an I/O error is encountered.
      *
      * @param file a compressed or uncompressed text file
      * @return  a buffered {@code InputIt} instance that iterates

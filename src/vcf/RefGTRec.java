@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Brian L. Browning
+ * Copyright 2023-2025 Brian L. Browning
  *
  * This file is part of the ibd-cluster program.
  *
@@ -17,6 +17,7 @@
  */
 package vcf;
 
+import blbutil.Const;
 import ints.IndexArray;
 import ints.IntArray;
 
@@ -117,6 +118,43 @@ public interface RefGTRec extends GTRec {
         }
     }
 
+    /**
+     * Returns the sum of the lengths of non-null rows of the specified
+     * two-dimensional array.
+     * @param alleleToHaps a two-dimensional array
+     * @return the sum of the lengths of non-null rows
+     * @throws NullPointerException if {@code alleleToHaps == null}
+     */
+    public static int nonNullCnt(int[][] alleleToHaps) {
+        int nonNullCnt=0;
+        for (int[] ia : alleleToHaps) {
+            if (ia!=null) {
+                nonNullCnt += ia.length;
+            }
+        }
+        return nonNullCnt;
+    }
+
+    /**
+     * Returns the smallest row index {@code j} such that
+     * {@code this.allelesToHap()[j] == null} or {@code -1}
+     * if no such allele index exists.
+     *
+     * @param alleleToHaps a two-dimensional array
+     * @return the smallest row index {@code j} such that
+     * {@code this.allelesToHap[j] == null} or {@code -1}
+     * if no such allele index exists
+     * @throws NullPointerException if {@code alleleToHaps == null}
+     */
+    public static int nullRow(int[][] alleleToHaps) {
+        for (int j=0; j<alleleToHaps.length; ++j) {
+            if (alleleToHaps[j]==null) {
+                return j;
+            }
+        }
+        return -1;
+    }    
+    
     /**
      * Returns an array of length {@code this.marker().nAlleles()} whose
      * {@code j}-th element is {@code null} or is a list of the
@@ -264,4 +302,42 @@ public interface RefGTRec extends GTRec {
      * {@code index < 0 || index >= this.nMaps()}
      */
     IntArray map(int index);
+
+    /**
+     * Returns the data in {@code this} as a string VCF record with
+     * correct INFO/AN and INFO/AC fields and with FORMAT/GT  as the only
+     * FORMAT field.
+     * @return the data represented by {@code this} as a string VCF
+     * record
+     */
+    @Override
+    public String toString();
+
+    /**
+     * Returns the data in the specified {@code RefGTRec} object as a
+     * string VCF record with correct INFO/AN and INFO/AC fields and
+     * with FORMAT/GT  as the only FORMAT field. The implementation of
+     * this method has suboptimal computational efficiency if
+     * {@code (rec.isAlleleCoded() == true)}.
+     * @param rec a VCF record with phased, non-missing genotypes
+     * @return the data represented by {@code rec} as a string VCF
+     * record
+     * @throws NullPointerException if {@code (rec == null)}
+     */
+    public static String toString(RefGTRec rec) {
+        int nHaps = rec.size();
+        StringBuilder sb = new StringBuilder();
+        rec.marker().appendFirst8Fields(sb, nHaps, rec.alleleCounts());
+        sb.append(Const.tab);
+        sb.append("GT");
+        assert (nHaps & 0b1) == 0;
+        for (int h=0; h<nHaps; h+=2) {
+            sb.append(Const.tab);
+            sb.append(rec.get(h));
+            sb.append(Const.phasedSep);
+            sb.append(rec.get(h | 0b1));
+        }
+        return sb.toString();
+    }
+
 }

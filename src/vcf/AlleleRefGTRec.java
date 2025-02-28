@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Brian L. Browning
+ * Copyright 2023-2025 Brian L. Browning
  *
  * This file is part of the ibd-cluster program.
  *
@@ -17,7 +17,7 @@
  */
 package vcf;
 
-import bref4.BrefRec;
+import blbutil.Const;
 import ints.IndexArray;
 import ints.IntArray;
 import java.util.Arrays;
@@ -209,7 +209,7 @@ public final class AlleleRefGTRec implements RefGTRec {
 
     @Override
     public int nAlleleCodedHaps() {
-        return BrefRec.nonNullCnt(alleleToHaps);
+        return RefGTRec.nonNullCnt(alleleToHaps);
     }
 
     @Override
@@ -310,16 +310,68 @@ public final class AlleleRefGTRec implements RefGTRec {
     }
 
     /**
-     * Returns the data represented by {@code this} as a VCF
-     * record with a GT format field. The returned VCF record
-     * will have missing QUAL and INFO fields, will have "PASS"
-     * in the filter field, and will have a GT format field.
-     * @return the data represented by {@code this} as a VCF
-     * record with a GT format field
+     * Returns the data represented by {@code this} as a string VCF record
+     * with correct INFO/AN and INFO/AC fields and with FORMAT/GT as the
+     * only FORMAT field.
+     * @return the data represented by {@code this} as a string VCF record
      */
     @Override
     public String toString() {
-        return GTRec.toVcfRec(this);
+        StringBuilder sb = new StringBuilder();
+        marker.appendFirst8Fields(sb, nHaps, alleleCounts());
+        sb.append(Const.tab);
+        sb.append("GT");
+        int[] minorIndices = sortedMinorIndices();
+        int[] minorAlleles = minorAlleles(minorIndices);
+        int index = 0;
+        int nextMinorHap = (index<minorIndices.length) ? minorIndices[index] : nHaps;
+        for (int h=0; h<nHaps; ++h) {
+            sb.append((h & 0b1)==0 ? Const.tab : Const.phasedSep);
+            if (h==nextMinorHap) {
+                sb.append(minorAlleles[index++]);
+                nextMinorHap = (index<minorAlleles.length) ? minorIndices[index] : nHaps;
+            }
+            else {
+                sb.append(majorAllele);
+            }
+        }
+        return sb.toString();
+    }
+
+    private int[] sortedMinorIndices() {
+        int cnt = 0;
+        for (int[] haps : alleleToHaps) {
+            if (haps!=null) {
+                cnt += haps.length;
+            }
+        }
+        int[] minorIndices = new int[cnt];
+        int start = 0;
+        for (int[] haps : alleleToHaps) {
+            if (haps!=null) {
+                System.arraycopy(haps, 0, minorIndices, start, haps.length);
+                start += haps.length;
+            }
+        }
+        assert start==minorIndices.length;
+        Arrays.sort(minorIndices);
+        return minorIndices;
+    }
+
+    private int[] minorAlleles(int[] minorIndices) {
+        int[] minorAlleles = new int[minorIndices.length];
+        for (int j=0; j<alleleToHaps.length; ++j) {
+            if (j!=majorAllele) {
+                int[] haps = alleleToHaps[j];
+                int index = 0;
+                for (int hap : haps) {
+                    index = Arrays.binarySearch(minorIndices, index, minorIndices.length, hap);
+                    assert index>=0;
+                    minorAlleles[index] = j;
+                }
+            }
+        }
+        return minorAlleles;
     }
 
     @Override

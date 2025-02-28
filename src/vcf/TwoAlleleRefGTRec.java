@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Brian L. Browning
+ * Copyright 2023-2025 Brian L. Browning
  *
  * This file is part of the ibd-cluster program.
  *
@@ -17,6 +17,7 @@
  */
 package vcf;
 
+import blbutil.Const;
 import ints.IndexArray;
 import ints.IntArray;
 import java.util.Arrays;
@@ -258,16 +259,30 @@ public final class TwoAlleleRefGTRec implements RefGTRec {
     }
 
     /**
-     * Returns the data represented by {@code this} as a VCF
-     * record with a GT format field. The returned VCF record
-     * will have missing QUAL and INFO fields, will have "PASS"
-     * in the filter field, and will have a GT format field.
-     * @return the data represented by {@code this} as a VCF
-     * record with a GT format field
+     * Returns the data represented by {@code this} as a string VCF record
+     * with correct INFO/AN and INFO/AC fields and with FORMAT/GT as the
+     * only FORMAT field.
+     * @return the data represented by {@code this} as a string VCF record
      */
     @Override
     public String toString() {
-        return GTRec.toVcfRec(this);
+        StringBuilder sb = new StringBuilder();
+        marker.appendFirst8Fields(sb, nHaps, alleleCounts());
+        sb.append(Const.tab);
+        sb.append("GT");
+        int index = 0;
+        int nextMinorHap = (index<minorAlleles.length) ? minorAlleles[index++] : nHaps;
+        for (int h=0; h<nHaps; ++h) {
+            sb.append((h & 0b1)==0 ? Const.tab : Const.phasedSep);
+            if (h==nextMinorHap) {
+                sb.append(minorAllele);
+                nextMinorHap = (index<minorAlleles.length) ? minorAlleles[index++] : nHaps;
+            }
+            else {
+                sb.append(majorAllele);
+            }
+        }
+        return sb.toString();
     }
 
     @Override
