@@ -203,7 +203,7 @@ bioRxiv 2025.02.22.639693;
 doi: [https://doi.org/10.1101/2025.02.22.639693](https://doi.org/10.1101/2025.02.22.639693)
 
 This study used the python script
-[find.gcs.py](https://raw.githubusercontent.com/browning-lab/ibd-cluster/master/src/find.gc.py)
+[find_gcs.py](https://raw.githubusercontent.com/browning-lab/ibd-cluster/master/src/find_gcs.py)
 to detect alleles changed by gene conversion.
 
 ## References
