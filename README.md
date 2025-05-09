@@ -7,7 +7,7 @@ biobank data with hundreds of thousands of individuals.
 Version 0.2 of **ibd-cluster** incorporates a probabilistic model and
 is more accurate than version 0.1
 
-Last updated: February 27, 2025  
+Last updated: May 9, 2025
 Version: 0.2.0
 
 ## Contents
@@ -201,6 +201,10 @@ the **ibd-cluster** method:
 population data using multi-individual identity by descent.
 bioRxiv 2025.02.22.639693;
 doi: [https://doi.org/10.1101/2025.02.22.639693](https://doi.org/10.1101/2025.02.22.639693)
+
+This study used the python script
+[find.gcs.py](https://raw.githubusercontent.com/browning-lab/ibd-cluster/master/src/find.gc.py)
+to detect alleles changed by gene conversion.
 
 ## References
 
